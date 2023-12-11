@@ -1,9 +1,27 @@
 from cmath import isnan
 from datetime import datetime, timedelta
 from pathlib import Path
+import time
 import re
 
 import pandas as pd
+import matplotlib.pyplot as plt
+
+#
+# build a list of time interval column headings
+#
+qtr_hr_fields: list[str] = []
+qtr_hr_times: list[datetime] = []
+today = datetime.today()
+dt = datetime(year=today.year, month=today.month, day=today.day, hour=0, minute=0, second=0)
+delta = timedelta(hours=0, minutes=15, seconds=0)
+for i in range(0, 96):
+    fmt_time = dt.strftime('%I:%M %p')
+    if fmt_time[0:1] == '0':
+        fmt_time = fmt_time[1:]
+    qtr_hr_fields.append(fmt_time)
+    qtr_hr_times.append(dt)
+    dt = dt + delta
 
 
 class HourlyUsageData:
@@ -13,13 +31,23 @@ class HourlyUsageData:
         self.to_date = to_date
         self.data_frame = data_frame
 
+    def save(self, datastore_path: Path):
+        ds = pd.HDFStore(datastore_path.__str__())
+        ds[self.name] = self
+        ds.close()
+
 
 class DailyUsageData:
-    def __init(self, from_date: datetime, to_date: datetime, data_frame: pd.DataFrame):
+    def __init__(self, from_date: datetime, to_date: datetime, data_frame: pd.DataFrame):
         self.name = f'Hourly-{from_date.strftime("%m%d%Y")}-{to_date.strftime("%m%d%Y")}'
         self.from_date = from_date
         self.to_date = to_date
         self.data_frame = data_frame
+
+    def save(self, datastore_path: Path):
+        ds = pd.HDFStore(datastore_path.__str__())
+        ds[self.name] = self
+        ds.close()
 
 
 class HourlyUsageDataFactory:
@@ -27,9 +55,9 @@ class HourlyUsageDataFactory:
     def from_spreadsheet(cls, hourly_usage_path: Path):
         # Load hourly usage spreadsheet and drop unneeded columns
         hourly_usage_df: pd.DataFrame = pd.read_excel(hourly_usage_path)
-        hourly_usage_df.drop(['Account Number', 'Meter Number'], inplace=True)
+        hourly_usage_df.drop(columns=['Account Number', 'Meter Number'], inplace=True)
         # Get from and to dates from the hourly usage data
-        date_range = hourly_usage_df['Date'].agg(['min', max])
+        date_range = hourly_usage_df['Date'].agg(['min', 'max'])
         from_date: datetime = datetime(year=date_range['min'].year,
                                        month=date_range['min'].month,
                                        day=date_range['min'].day)
@@ -39,19 +67,6 @@ class HourlyUsageDataFactory:
         #
         # assemble a pivot table with a row for each usage time interval
         #
-        # build a list of time interval column headings
-        qtr_hr_fields: list[str] = []
-        qtr_hr_times: list[datetime] = []
-        today = datetime.today()
-        dt = datetime(year=today.year, month=today.month, day=today.day, hour=0, minute=0, second=0)
-        delta = timedelta(hours=0, minutes=15, seconds=0)
-        for i in range(0, 96):
-            fmt_time = dt.strftime('%I:%M %p')
-            if fmt_time[0:1] == '0':
-                fmt_time = fmt_time[1:]
-            qtr_hr_fields.append(fmt_time)
-            qtr_hr_times.append(dt)
-            dt = dt + delta
         # create a Series containing the average usage for each time interval
         ave_df = hourly_usage_df[qtr_hr_fields].agg(['mean'])
         # build lists for actual usage, date and entry type ('mean' or 'actual')
@@ -69,7 +84,7 @@ class HourlyUsageDataFactory:
             usage_type.append('mean')
         # create Series objects for actual usage, date and entry type
         time_series: pd.Series = pd.Series(data=usage_index, dtype='datetime64[ns]')
-        usage_series: pd.Series = pd.Series(data=usage_data, dtype='float64')
+        usage_series: pd.Series = pd.Series(data=usage_data)
         type_series: pd.Series = pd.Series(data=usage_type, dtype='object')
         # create a DataFrame using the Series created above
         usage_df = pd.DataFrame({'time': time_series, 'usage': usage_series, 'type': type_series})
@@ -98,20 +113,29 @@ class DailyUsageDataFactory:
     def from_spreadsheet(cls, hourly_usage_path: Path, daily_temp_path: Path):
         # Load hourly usage spreadsheet and drop unneeded columns
         daily_usage_df: pd.DataFrame = pd.read_excel(hourly_usage_path)
-        daily_usage_df.drop(['Account Number', 'Meter Number'], inplace=True)
-        daily_usage_df.index = pd.to_datetime(daily_usage_df['Date'])
-        # Load daily temp spreadsheet and create a datetime index
-        daily_temp_df: pd.DataFrame = pd.read_excel(daily_temp_path)
-        daily_temp_df.index = pd.to_datetime(daily_temp_df['Date'])
+        drop_fields: list[str] = ['Account Number', 'Meter Number', 'Min', 'Max'] + qtr_hr_fields
+        daily_usage_df.drop(columns=drop_fields, inplace=True)
         # Get from and to dates from the hourly usage data
-        date_range = daily_usage_df['Date'].agg(['min', max])
+        date_range = daily_usage_df['Date'].agg(['min', 'max'])
         from_date: datetime = datetime(year=date_range['min'].year,
                                        month=date_range['min'].month,
                                        day=date_range['min'].day)
         to_date: datetime = datetime(year=date_range['max'].year,
                                      month=date_range['max'].month,
                                      day=date_range['max'].day)
-        usage_and_temp_df = daily_usage_df.merge()
+        # Create an index by date and drop the date column
+        #daily_usage_df.index = pd.to_datetime(daily_usage_df['Date'])
+        #daily_usage_df.drop(columns=['Date'], inplace=True)
+        # Load daily temp spreadsheet and create a datetime index
+        daily_temp_df: pd.DataFrame = pd.read_excel(daily_temp_path)
+        daily_temp_df['Date'] = pd.to_datetime(daily_temp_df['Date'], format='%Y-%m-%d')
+        #daily_temp_df.index = pd.to_datetime(daily_temp_df['Date'])
+        #daily_temp_df.drop(columns=['Date'], inplace=True)
+        usage_and_temp_df = daily_usage_df.merge(how='left',
+                                                 on='Date',
+                                                 right=daily_temp_df)
+        return DailyUsageData(from_date=from_date, to_date=to_date, data_frame=usage_and_temp_df)
+
     @classmethod
     def from_datastore(cls, datastore_path: Path, name: str) -> DailyUsageData:
         # extract from and to dates from data store entry name
@@ -128,3 +152,16 @@ class DailyUsageDataFactory:
         with pd.HDFStore(datastore_path.__str__()) as ds:
             usage_df = ds[name]
         return DailyUsageData(from_date=from_date, to_date=to_date, data_frame=usage_df)
+
+
+if __name__ == '__main__':
+    usage_path = Path('data/power-usage.xlsx')
+    #hourly_usage_data = HourlyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path)
+    temp_path = Path('data/temp-data.xlsx')
+    daily_usage_data = DailyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path,
+                                                              daily_temp_path=temp_path)
+    daily_usage_data.data_frame.plot.line(x='Date', y='Total')
+    plt.show()
+    #datastore_path = Path('data/test_data.h5')
+    #hourly_usage_data.save(datastore_path)
+    #daily_usage_data.save(datastore_path)
