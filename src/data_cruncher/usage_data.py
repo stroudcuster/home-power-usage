@@ -31,6 +31,18 @@ class HourlyUsageData:
         self.to_date = to_date
         self.data_frame = data_frame
 
+    def min(self) -> pd.DataFrame:
+        return self.data_frame[(self.data_frame['type'] == 'min')]
+
+    def mean(self) -> pd.DataFrame:
+        return self.data_frame[self.data_frame['type'] == 'mean']
+
+    def max(self) -> pd.DataFrame:
+        return self.data_frame[self.data_frame['type'] == 'max']
+
+    def actual(self) -> pd.DataFrame:
+        return self.data_frame[self.data_frame['type'] == 'actual']
+
     def save(self, datastore_path: Path):
         ds = pd.HDFStore(datastore_path.__str__())
         ds[self.name] = self
@@ -68,7 +80,7 @@ class HourlyUsageDataFactory:
         # assemble a pivot table with a row for each usage time interval
         #
         # create a Series containing the average usage for each time interval
-        ave_df = hourly_usage_df[qtr_hr_fields].agg(['mean'])
+        agg_df = hourly_usage_df[qtr_hr_fields].agg(['min', 'mean', 'max'])
         # build lists for actual usage, date and entry type ('mean' or 'actual')
         usage_data: list[float]= []
         usage_index: list[datetime] = []
@@ -79,12 +91,18 @@ class HourlyUsageDataFactory:
                     usage_data.append(usage)
                     usage_index.append(qtr_hr_times[idx])
                     usage_type.append('actual')
-            usage_data.append(ave_df[field])
+            usage_data.append(agg_df[field]['min'])
+            usage_index.append(qtr_hr_times[idx])
+            usage_type.append('min')
+            usage_data.append(agg_df[field]['mean'])
             usage_index.append(qtr_hr_times[idx])
             usage_type.append('mean')
+            usage_data.append(agg_df[field]['max'])
+            usage_index.append(qtr_hr_times[idx])
+            usage_type.append('max')
         # create Series objects for actual usage, date and entry type
         time_series: pd.Series = pd.Series(data=usage_index, dtype='datetime64[ns]')
-        usage_series: pd.Series = pd.Series(data=usage_data)
+        usage_series: pd.Series = pd.Series(data=usage_data, dtype='float64')
         type_series: pd.Series = pd.Series(data=usage_type, dtype='object')
         # create a DataFrame using the Series created above
         usage_df = pd.DataFrame({'time': time_series, 'usage': usage_series, 'type': type_series})
@@ -156,7 +174,7 @@ class DailyUsageDataFactory:
 
 if __name__ == '__main__':
     usage_path = Path('data/power-usage.xlsx')
-    #hourly_usage_data = HourlyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path)
+    hourly_usage_data = HourlyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path)
     temp_path = Path('data/temp-data.xlsx')
     daily_usage_data = DailyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path,
                                                               daily_temp_path=temp_path)
