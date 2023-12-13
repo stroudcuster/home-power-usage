@@ -1,9 +1,7 @@
 from cmath import isnan
 from datetime import datetime, timedelta
 from pathlib import Path
-import time
 import re
-
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -174,7 +172,7 @@ class DailyUsageDataFactory:
 
 if __name__ == '__main__':
     usage_path = Path('data/power-usage.xlsx')
-    hourly_usage_data = HourlyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path)
+    #hourly_usage_data = HourlyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path)
     temp_path = Path('data/temp-data.xlsx')
     daily_usage_data = DailyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path,
                                                               daily_temp_path=temp_path)
