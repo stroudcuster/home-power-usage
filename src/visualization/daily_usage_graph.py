@@ -38,7 +38,9 @@ if __name__ == '__main__':
     usage_path = Path('data/power-usage.xlsx')
     temp_path = Path('data/temp-data.xlsx')
     daily_usage_data = DailyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path,
-                                                              daily_temp_path=temp_path)
+                                                              daily_temp_path=temp_path,
+                                                              from_date=datetime(year=2023, month=11, day=1),
+                                                              to_date=datetime(year=2023, month=11, day=30))
     fig, ax_dict = plt.subplot_mosaic([['usage_graph'], ['temp_graph']])
     dug = DailyUsageGraph(usage_data=daily_usage_data,
                           usage_axes=ax_dict['usage_graph'],

@@ -41,7 +41,9 @@ class HourlyUsageGraph:
 
 if __name__ == '__main__':
     usage_path = Path('data/power-usage.xlsx')
-    hourly_usage_data = HourlyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path)
+    hourly_usage_data = HourlyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path,
+                                                                from_date=datetime(year=2023, month=11, day=5),
+                                                                to_date=datetime(year=2023, month=11, day=18))
     fig, ax = plt.subplots()
     hrg = HourlyUsageGraph(usage_data=hourly_usage_data, axes=ax, show=(DataType.AVERAGE, ))
     plt.show()
