@@ -5,6 +5,7 @@ from data_cruncher.usage_data import qtr_hr_times, qtr_hr_fields, DailyUsageData
 from data_type import DataType
 
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 class DailyUsageGraph:
@@ -39,12 +40,11 @@ if __name__ == '__main__':
     temp_path = Path('data/temp-data.xlsx')
     daily_usage_data = DailyUsageDataFactory.from_spreadsheet(hourly_usage_path=usage_path,
                                                               daily_temp_path=temp_path,
-                                                              from_date=datetime(year=2023, month=11, day=1),
-                                                              to_date=datetime(year=2023, month=11, day=30))
+                                                              from_date=datetime(year=2023, month=12, day=31),
+                                                              to_date=datetime(year=2024, month=1, day=12))
     fig, ax_dict = plt.subplot_mosaic([['usage_graph'], ['temp_graph']])
     dug = DailyUsageGraph(usage_data=daily_usage_data,
                           usage_axes=ax_dict['usage_graph'],
                           temp_axes=ax_dict['temp_graph'])
     plt.show()
     pass
-

@@ -67,10 +67,10 @@ class TemperatureDataFactory:
         payload = json.loads(response.read())
         daily_temps = payload['days']
         data: dict[str, list[datetime | float]] = {}
-        data[DATE_COL]: list(datetime) = []
-        data[MIN_TEMP_COL]: list(float) = []
-        data[MAX_TEMP_COL]: list(float) = []
-        data[AVE_TEMP_COL]: list(float) = []
+        data[DATE_COL]: list[datetime] = []
+        data[MIN_TEMP_COL]: list[float] = []
+        data[MAX_TEMP_COL]: list[float] = []
+        data[AVE_TEMP_COL]: list[float] = []
         for daily_temp in daily_temps:
             data[DATE_COL].append(datetime.strptime(daily_temp['datetime'], '%Y-%m-%d'))
             data[MIN_TEMP_COL].append(daily_temp['tempmin'])

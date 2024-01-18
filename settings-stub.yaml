@@ -1,0 +1,20 @@
+---
+#
+# Settings for home-power-usage app
+#
+# folders
+data_store_folder: data-stores
+input_data_folder: input-data
+# reg exp patterns to filler daily and hourly usage dataframes
+daily_dataframe_filter: Daily-(\d{2}/\d{2}/\d{4})-(\d{2}/\d{2}/\d{4})
+hourly_dataframe_filter: Hourly-(\d{2}/\d{2}/\d{4})-(\d{2}/\d{2}/\d{4})
+# temperature retrieval settings
+temp_data_source: visualcrossing
+temp_data_source_settings: {
+  url: "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/_LATITUDE_,_LONGITUDE_?key=_API_KEY_",
+  longitude: 0,
+  latitude: 0,
+  api_key: xxx
+}
+# power usage retrieval settings
+power_usage_url: https://www.pplelectric.com/
