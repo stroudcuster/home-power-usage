@@ -1,10 +1,15 @@
+from os import chdir
 from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
 import PySimpleGUIQt as sg
 
-from settings.settings import Settings, TEMP_DATA_SOURCES
+from settings.settings import (Settings,
+                               TEMP_DATA_SOURCES,
+                               TEMP_DATA_SOURCE_VISUAL_CROSSING,
+                               TEMP_DATA_SOURCE_SC_ACIS,
+                               VisualCrossingSettings)
 
 DATA_STORE_FOLDER = 'Data Store Folder:'
 INPUT_DATA_FOLDER = 'Input Data Folder:'
@@ -16,45 +21,16 @@ VISUAL_CROSSING_SETTINGS = 'Visual Crossing Settings'
 VC_URL = 'Visual Crossing URL:'
 VC_LATITUDE = 'Latitude:'
 VC_LONGITUDE = 'Longitude:'
-API_KEY = 'API Key:'
+VC_API_KEY = 'API Key:'
 EDIT_TEMP_SETTINGS = 'Edit Temp Settings'
 CANCEL = 'Cancel'
 SAVE = 'Save Settings'
 ERROR_MSG = 'Error Messages'
 
 
-class SettingsGUI:
-    def __init__(self, settings: Settings, app_folder: Path ):
-        self.settings = settings
-        self.focus_element_key = DATA_STORE_FOLDER
-        layout = [
-                  [sg.Text(text='Application Settings')],
-                  [sg.Text(text=DATA_STORE_FOLDER),
-                   sg.InputText(default_text=self.settings.data_store_folder,
-                                size_px=(600, 30), enable_events=True, key=DATA_STORE_FOLDER),
-                   sg.FolderBrowse(button_text='Browse', target=DATA_STORE_FOLDER, initial_folder=app_folder.__str__())],
-                  [sg.Text(text=INPUT_DATA_FOLDER),
-                   sg.InputText(default_text=self.settings.input_data_folder,
-                                size_px=(600, 30), enable_events=True, key=INPUT_DATA_FOLDER),
-                   sg.FolderBrowse(button_text='Browse', target=INPUT_DATA_FOLDER, initial_folder=app_folder.__str__())],
-                  [sg.Text(text=DAILY_DATAFRAME_FILTER),
-                   sg.InputText(default_text=self.settings.daily_dataframe_filter,
-                                size=(600, 30), enable_events=True, key=DAILY_DATAFRAME_FILTER)],
-                  [sg.Text(text=HOURLY_DATAFRAME_FILTER),
-                   sg.InputText(default_text=self.settings.hourly_dataframe_filter,
-                                size=(600, 30), enable_events=True, key=HOURLY_DATAFRAME_FILTER)],
-                  [sg.Text(text=TEMP_DATA_SOURCE),
-                   sg.Combo(values=TEMP_DATA_SOURCES, default_value=self.settings.temp_data_source),
-                   sg.Button(button_text=EDIT_TEMP_SETTINGS, key=EDIT_TEMP_SETTINGS)],
-                  [sg.Text(text=POWER_USAGE_URL),
-                   sg.InputText(default_text=self.settings.power_usage_url,
-                                size_px=(600, 30), enable_events=True, key=POWER_USAGE_URL)],
-                  [sg.MultilineOutput(default_text='', key=ERROR_MSG, size_px=(600, 120))],
-                  [sg.Cancel(button_text=CANCEL, key=CANCEL), sg.OK(button_text=SAVE, key=SAVE)],
-                 ]
-        self.window = sg.Window('Application Settings', layout, default_element_size=(12, 1), auto_size_text=False,
-                                auto_size_buttons=False,
-                                default_button_element_size=(12, 1))
+class BaseGUI:
+    def __init__(self):
+        self.window = None
 
     def post_error_msg(self, msg: str):
         self.window.Element(ERROR_MSG).update(f'{msg}\n', append=True)
@@ -74,42 +50,185 @@ class SettingsGUI:
             self.post_error_msg(f'{key} is not a valid URL')
             return True
 
+
+class VisualCrossingSettingsGUI(BaseGUI):
+    def __init__(self, vc_settings: VisualCrossingSettings, app_folder: Path):
+        BaseGUI.__init__(self)
+        self.vc_settings: VisualCrossingSettings = vc_settings
+        self.app_folder:Path = app_folder
+        self.focus_element_key:str = VC_URL
+        layout = [
+            [sg.Text(text=VC_URL),
+             sg.InputText(default_text=vc_settings.url,
+                          size_px=(1000, 30), enable_events=True, key=VC_URL)],
+            [sg.Text(text=VC_LATITUDE),
+             sg.InputText(default_text=f'{vc_settings.latitude:.5f}',
+                          size_px=(100, 30), enable_events=True, key=VC_LATITUDE)],
+            [sg.Text(text=VC_LONGITUDE),
+             sg.InputText(default_text=f'{vc_settings.longitude:.5f}',
+                          size_px=(100, 30), enable_events=True, key=VC_LONGITUDE)],
+            [sg.Text(text=VC_API_KEY),
+             sg.InputText(default_text=vc_settings.api_key,
+                          size_px=(600, 30), enable_events=True, key=VC_API_KEY)],
+            [sg.Cancel(button_text=CANCEL, key=CANCEL), sg.OK(button_text=SAVE, key=SAVE)],
+        ]
+        self.window = sg.Window('Visual Crossing Temperature Data Settings', layout,
+                                default_element_size=(12, 1), auto_size_text=False,
+                                auto_size_buttons=False,
+                                default_button_element_size=(12, 1))
+
+    def check_lat_long(self, label: str, value: str) -> bool:
+        error = False;
+        if not value.isdecimal():
+            self.post_error_msg(f'{label} must be numeric.')
+            error = True
+        else:
+            float_value = float(value)
+            if float_value < -90 or float_value > 90:
+                self.post_error_msg(f'{label} must be between -90 and 90.')
+                error = True
+        return error
+
+    def on_change_validations(self, values) -> bool:
+        self.clear_error_msg()
+        errors: list[bool] = []
+        if len(values[VC_URL]) == 0:
+            self.post_error_msg(f'{VC_URL} is required to use Visual Crossing as a data source.')
+            errors.append(True)
+        errors.append(self.check_lat_long(VC_LATITUDE, values[VC_LATITUDE]))
+        errors.append(self.check_lat_long(VC_LONGITUDE, values[VC_LONGITUDE]))
+        if len(values[VC_API_KEY]) == 0:
+            self.post_error_msg(f'{VC_API_KEY} is required to use Visual Crossing as a data source.')
+        return any(errors)
+
+    def on_save_validations(self, values) -> bool:
+        errors: list[bool] = [self.on_change_validations(values)]
+        if len(values[VC_URL]) > 0:
+            url_parts = urlparse(values[VC_URL])
+            url = f'{url_parts.scheme}://{url_parts.netloc}'
+            errors.append(self.url_bad(VC_URL, url))
+        return any(errors)
+
+    def read(self) -> VisualCrossingSettings | None:
+        self.focus_element_key = VC_URL
+        error = False
+        while True:
+            event, values = self.window.read()
+            if event == CANCEL or event == sg.WIN_CLOSED:
+                self.vc_settings = None
+                break
+            else:
+                if self.focus_element_key != self.window.FocusElement.Key:
+                    error = self.on_change_validations(values)
+                    self.focus_element_key = self.window.FocusElement.Key
+        self.window.close()
+        return self.vc_settings
+
+
+class SettingsGUI(BaseGUI):
+    def __init__(self, settings: Settings, app_folder: Path ):
+        BaseGUI.__init__(self)
+        self.settings = settings
+        self.app_folder = app_folder
+        self.focus_element_key = DATA_STORE_FOLDER
+        layout = [
+                  [sg.Text(text=DATA_STORE_FOLDER),
+                   sg.InputText(default_text=self.settings.data_store_folder,
+                                size_px=(600, 30), enable_events=True, key=DATA_STORE_FOLDER),
+                   sg.FolderBrowse(button_text='Browse', target=DATA_STORE_FOLDER,
+                                   initial_folder=app_folder.__str__())],
+                  [sg.Text(text=INPUT_DATA_FOLDER),
+                   sg.InputText(default_text=self.settings.input_data_folder,
+                                size_px=(600, 30), enable_events=True, key=INPUT_DATA_FOLDER),
+                   sg.FolderBrowse(button_text='Browse', target=INPUT_DATA_FOLDER,
+                                   initial_folder=app_folder.__str__())],
+                  [sg.Text(text=DAILY_DATAFRAME_FILTER),
+                   sg.InputText(default_text=self.settings.daily_dataframe_filter,
+                                size=(600, 30), enable_events=True, key=DAILY_DATAFRAME_FILTER)],
+                  [sg.Text(text=HOURLY_DATAFRAME_FILTER),
+                   sg.InputText(default_text=self.settings.hourly_dataframe_filter,
+                                size=(600, 30), enable_events=True, key=HOURLY_DATAFRAME_FILTER)],
+                  [sg.Text(text=TEMP_DATA_SOURCE),
+                   sg.Combo(values=TEMP_DATA_SOURCES, default_value=self.settings.temp_data_source,
+                            key=TEMP_DATA_SOURCE),
+                   sg.Button(button_text=EDIT_TEMP_SETTINGS, key=EDIT_TEMP_SETTINGS)],
+                  [sg.Text(text=POWER_USAGE_URL),
+                   sg.InputText(default_text=self.settings.power_usage_url,
+                                size_px=(600, 30), enable_events=True, key=POWER_USAGE_URL)],
+                  [sg.MultilineOutput(default_text='', key=ERROR_MSG, size_px=(600, 120))],
+                  [sg.Cancel(button_text=CANCEL, key=CANCEL), sg.OK(button_text=SAVE, key=SAVE)],
+                 ]
+        self.window = sg.Window('Application Settings', layout, default_element_size=(12, 1), auto_size_text=False,
+                                auto_size_buttons=False,
+                                default_button_element_size=(12, 1))
+
     def on_change_validations(self, values: dict) -> bool:
         self.clear_error_msg()
-        error = False
+        errors: list[bool] = []
         if len(values[DATA_STORE_FOLDER]) == 0:
             self.post_error_msg(f'{DATA_STORE_FOLDER} must have a value.')
-            error = True
+            errors.append(True)
+        else:
+            path: Path = Path(values[DATA_STORE_FOLDER])
+            if path.exists() and not path.is_dir():
+                self.post_error_msg(f'{DATA_STORE_FOLDER} must refer to a folder')
+                errors.append(True)
         if len(values[INPUT_DATA_FOLDER]) == 0:
             self.post_error_msg(f'{INPUT_DATA_FOLDER} must have a value.')
+            errors.append(True)
+        else:
+            path: Path = Path(values[INPUT_DATA_FOLDER])
+            if path.exists() and not path.is_dir():
+                self.post_error_msg(f'{INPUT_DATA_FOLDER} must refer to a folder.')
+                errors.append(True)
         if not values[TEMP_DATA_SOURCE] in TEMP_DATA_SOURCES:
             self.post_error_msg(f'{TEMP_DATA_SOURCE} not valid.')
-            error = True
-        error = self.url_bad(POWER_USAGE_URL, values[POWER_USAGE_URL])
+            errors.append(True)
+        if error := any(errors):
+            ...
         return error
 
     def on_save_validations(self,  values: dict) -> bool:
-        error: bool = self.on_change_validations(values)
-        if not error:
+        errors: list[bool] = [self.on_change_validations(values)]
+        if not any(errors):
             path: Path = Path(values[DATA_STORE_FOLDER])
             if not path.exists():
-                ...
-        if not error:
+                create = sg.popup_ok_cancel(f"{values[DATA_STORE_FOLDER]} not found.  Create new folder?")
+                if create == 'OK':
+                    path.mkdir()
+                else:
+                    self.post_error_msg(f'{DATA_STORE_FOLDER} does not exist and creation was declined.')
+                    errors.append(True)
+        if not any(errors):
             path: Path = Path(values[INPUT_DATA_FOLDER])
             if not path.exists():
-                ...
-        return error
+                create = sg.popup_ok_cancel(f"{values[INPUT_DATA_FOLDER]} not found.  Create new folder?")
+                if create == 'OK':
+                    path.mkdir()
+                else:
+                    self.post_error_msg(f'{INPUT_DATA_FOLDER} does not exist and creation was declined.')
+                    errors.append(True)
+        if len(values[POWER_USAGE_URL]) > 0:
+            errors.append(self.url_bad(POWER_USAGE_URL, values[POWER_USAGE_URL]))
+        return any(errors)
 
     def read(self) -> Settings | None:
         self.focus_element_key = DATA_STORE_FOLDER
         error = False
         while True:
             event, values = self.window.read()
-            if event == CANCEL:
+            if event == CANCEL or event == sg.WIN_CLOSED:
                 self.settings = None
                 break
             elif event == EDIT_TEMP_SETTINGS:
-                ...
+                if values[TEMP_DATA_SOURCE] == TEMP_DATA_SOURCE_VISUAL_CROSSING:
+                    vc_settings = VisualCrossingSettings(self.settings.temp_data_source_settings)
+                    temp_window = VisualCrossingSettingsGUI(vc_settings, self.app_folder)
+                    vc_settings = temp_window.read()
+                    if vc_settings is not None:
+                        self.settings.temp_data_source_settings(vc_settings)
+                elif values[TEMP_DATA_SOURCE] == TEMP_DATA_SOURCE_SC_ACIS:
+                    ...
             elif event == SAVE:
                 if not error:
                     error = self.on_save_validations(values)

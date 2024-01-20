@@ -6,7 +6,11 @@ try:
 except ImportError:
     from yaml import Loader, Dumper
 
-TEMP_DATA_SOURCES = ['Visual Crossing', 'SC ACIS']
+TEMP_DATA_SOURCE_VISUAL_CROSSING = 'Visual Crossing'
+TEMP_DATA_SOURCE_SC_ACIS = 'SC ACIS'
+TEMP_DATA_SOURCES = [TEMP_DATA_SOURCE_VISUAL_CROSSING, TEMP_DATA_SOURCE_SC_ACIS]
+
+
 class Settings:
     def __init__(self, data):
         self._data = data
