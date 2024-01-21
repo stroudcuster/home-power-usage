@@ -70,6 +70,7 @@ class VisualCrossingSettingsGUI(BaseGUI):
             [sg.Text(text=VC_API_KEY),
              sg.InputText(default_text=vc_settings.api_key,
                           size_px=(600, 30), enable_events=True, key=VC_API_KEY)],
+            [sg.MultilineOutput(default_text='', key=ERROR_MSG, size_px=(600, 120))],
             [sg.Cancel(button_text=CANCEL, key=CANCEL), sg.OK(button_text=SAVE, key=SAVE)],
         ]
         self.window = sg.Window('Visual Crossing Temperature Data Settings', layout,
@@ -78,15 +79,15 @@ class VisualCrossingSettingsGUI(BaseGUI):
                                 default_button_element_size=(12, 1))
 
     def check_lat_long(self, label: str, value: str) -> bool:
-        error = False;
-        if not value.isdecimal():
-            self.post_error_msg(f'{label} must be numeric.')
-            error = True
-        else:
+        error = False
+        try:
             float_value = float(value)
             if float_value < -90 or float_value > 90:
                 self.post_error_msg(f'{label} must be between -90 and 90.')
                 error = True
+        except ValueError:
+            self.post_error_msg(f'{label} must be numeric.')
+            error = True
         return error
 
     def on_change_validations(self, values) -> bool:
@@ -117,10 +118,21 @@ class VisualCrossingSettingsGUI(BaseGUI):
             if event == CANCEL or event == sg.WIN_CLOSED:
                 self.vc_settings = None
                 break
+            elif event == SAVE:
+                if not error:
+                    error = self.on_save_validations(values)
+                    if not error:
+                        self.vc_settings.url = values[VC_URL]
+                        self.vc_settings.latitude = float(values[VC_LATITUDE])
+                        self.vc_settings.longitude = float(values[VC_LONGITUDE])
+                        self.vc_settings.api_key = values[VC_API_KEY]
+                        break
             else:
                 if self.focus_element_key != self.window.FocusElement.Key:
                     error = self.on_change_validations(values)
                     self.focus_element_key = self.window.FocusElement.Key
+                else:
+                    error = False
         self.window.close()
         return self.vc_settings
 
@@ -226,13 +238,19 @@ class SettingsGUI(BaseGUI):
                     temp_window = VisualCrossingSettingsGUI(vc_settings, self.app_folder)
                     vc_settings = temp_window.read()
                     if vc_settings is not None:
-                        self.settings.temp_data_source_settings(vc_settings)
+                        self.settings.temp_data_source_settings = vc_settings.to_dict()
                 elif values[TEMP_DATA_SOURCE] == TEMP_DATA_SOURCE_SC_ACIS:
                     ...
             elif event == SAVE:
                 if not error:
                     error = self.on_save_validations(values)
                     if not error:
+                        self.settings.data_store_folder = values[DATA_STORE_FOLDER]
+                        self.settings.input_data_folder = values[INPUT_DATA_FOLDER]
+                        self.settings.daily_dataframe_filter = values[DAILY_DATAFRAME_FILTER]
+                        self.settings.hourly_dataframe_filter = values[HOURLY_DATAFRAME_FILTER]
+                        self.settings.temp_data_source = values[TEMP_DATA_SOURCE]
+                        self.settings.power_usage_url = values[POWER_USAGE_URL]
                         break
                 else:
                     self.post_error_msg(f'You must correct errors before saving the settings.')
@@ -240,13 +258,7 @@ class SettingsGUI(BaseGUI):
                 if self.focus_element_key != self.window.FocusElement.Key:
                     error = self.on_change_validations(values)
                     self.focus_element_key = self.window.FocusElement.Key
+        self.window.close()
         return self.settings
 
 
-if __name__ == '__main__':
-    from settings.settings import load_settings
-    app_folder = Path('/home/stroud/PycharmProjects/home-power-usage')
-    settings = load_settings(Path(app_folder, 'settings.yaml'))
-    w = SettingsGUI(settings=settings, app_folder=app_folder)
-    settings = w.read()
-    pass

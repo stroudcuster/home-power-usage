@@ -1,5 +1,13 @@
+import os
+from pathlib import Path
+
 import PySimpleGUIQt as sg
 
+from gui.settings_gui import SettingsGUI
+from settings.settings import load_settings, save_settings, Settings
+
+
+APP_FOLDER = 'APP_FOLDER'
 SETTINGS = "Settings"
 EXIT = 'Exit'
 CREATE_DS = 'Create Data Store'
@@ -17,6 +25,7 @@ OUTPUT_KEY = 'Output'
 class MainGUI:
 
     def __init__(self):
+        self.app_folder: Path = Path(os.environ.get(APP_FOLDER))
         menu_def = [['Misc', [SETTINGS, EXIT]],
                     ['Data Stores', [CREATE_DS, DELETE_DS, SELECT_DS]],
                     ['Data Frames', [CREATE_DF, MERGE_DF, DELETE_DF]],
@@ -28,7 +37,12 @@ class MainGUI:
                                 default_button_element_size=(12, 1))
 
     def settings(self):
-        self.window.Element(OUTPUT_KEY).update(f'{SETTINGS} selected.')
+        settings_path: Path = Path(self.app_folder, 'settings.yaml')
+        settings: Settings = load_settings(settings_path)
+        w = SettingsGUI(settings=settings, app_folder=self.app_folder)
+        settings = w.read()
+        if settings is not None:
+            save_settings(settings, settings_path)
 
     def create_data_store(self):
         self.window.Element(OUTPUT_KEY).update(f'{CREATE_DS} selected.')

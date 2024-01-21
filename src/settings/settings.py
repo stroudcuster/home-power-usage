@@ -11,6 +11,46 @@ TEMP_DATA_SOURCE_SC_ACIS = 'SC ACIS'
 TEMP_DATA_SOURCES = [TEMP_DATA_SOURCE_VISUAL_CROSSING, TEMP_DATA_SOURCE_SC_ACIS]
 
 
+class VisualCrossingSettings:
+    def __init__(self, data):
+        self._data = data
+
+    @property
+    def url(self):
+        return self._data['url']
+
+    @url.setter
+    def url(self, url):
+        self._data['url'] = url
+
+    @property
+    def latitude(self):
+        return self._data['latitude']
+
+    @latitude.setter
+    def latitude(self, latitude):
+        self._data['latitude'] = latitude
+
+    @property
+    def longitude(self):
+        return self._data['longitude']
+
+    @longitude.setter
+    def longitude(self, longitude):
+        self._data['longitude'] = longitude
+
+    @property
+    def api_key(self):
+        return self._data['api_key']
+
+    @api_key.setter
+    def api_key(self, api_key):
+        self._data['api_key'] = api_key
+
+    def to_dict(self):
+        return self._data
+
+
 class Settings:
     def __init__(self, data):
         self._data = data
@@ -77,43 +117,6 @@ class Settings:
 
     def __repr__(self):
         return f'{self.__class__.__name__}(data={self._data})'
-
-
-class VisualCrossingSettings:
-    def __init__(self, data):
-        self._data = data
-
-    @property
-    def url(self):
-        return self._data['url']
-
-    @url.setter
-    def url(self, url):
-        self._data['url'] = url
-
-    @property
-    def latitude(self):
-        return self._data['latitude']
-
-    @latitude.setter
-    def latitude(self, latitude):
-        self._data['latitude'] = latitude
-
-    @property
-    def longitude(self):
-        return self._data['longitude']
-
-    @longitude.setter
-    def longitude(self, longitude):
-        self._data['longitude'] = longitude
-
-    @property
-    def api_key(self):
-        return self._data['api_key']
-
-    @api_key.setter
-    def api_key(self, api_key):
-        self._data['api_key'] = api_key
 
 
 def load_settings(yaml_file: Path) -> Settings:
