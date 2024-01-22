@@ -9,6 +9,7 @@ from settings.settings import (Settings,
                                TEMP_DATA_SOURCES,
                                TEMP_DATA_SOURCE_VISUAL_CROSSING,
                                TEMP_DATA_SOURCE_SC_ACIS,
+                               Validator,
                                VisualCrossingSettings)
 
 DATA_STORE_FOLDER = 'Data Store Folder:'
@@ -39,15 +40,16 @@ class BaseGUI:
         self.window.Element(ERROR_MSG).update('')
 
     def url_bad(self, key: str, url_str: str) -> bool:
-        url_parts = urlparse(url_str)
-        if len(url_parts.scheme) == 0 or len(url_parts.netloc) == 0:
-            self.post_error_msg(f'{key} is not a valid URL')
-            return True
         try:
-            urlopen(f'{url_parts.scheme}://{url_parts.netloc}')
-            return False
-        except ValueError:
-            self.post_error_msg(f'{key} is not a valid URL')
+            url_parts = Validator.url_parse(url_str)
+            try:
+                Validator.url_open(f'{url_parts.scheme}://{url_parts.netloc}')
+                return False
+            except ValueError as excep:
+                self.post_error_msg(f'{key} {excep.args[0]}')
+                return True
+        except ValueError as excep:
+            self.post_error_msg(f'{key} {excep.args[0]}')
             return True
 
 
@@ -81,25 +83,30 @@ class VisualCrossingSettingsGUI(BaseGUI):
     def check_lat_long(self, label: str, value: str) -> bool:
         error = False
         try:
-            float_value = float(value)
-            if float_value < -90 or float_value > 90:
-                self.post_error_msg(f'{label} must be between -90 and 90.')
-                error = True
-        except ValueError:
-            self.post_error_msg(f'{label} must be numeric.')
+            if label == VC_LATITUDE:
+                Validator.latitude(value)
+            elif label == VC_LONGITUDE:
+                Validator.longitude(value)
+        except ValueError as excep:
+            self.post_error_msg(f'{label} {excep.args[0]}')
             error = True
         return error
 
     def on_change_validations(self, values) -> bool:
         self.clear_error_msg()
         errors: list[bool] = []
-        if len(values[VC_URL]) == 0:
-            self.post_error_msg(f'{VC_URL} is required to use Visual Crossing as a data source.')
+        try:
+            Validator.vc_required(values[VC_URL])
+        except ValueError as excep:
+            self.post_error_msg(f'{VC_URL} {excep.args[0]}')
             errors.append(True)
         errors.append(self.check_lat_long(VC_LATITUDE, values[VC_LATITUDE]))
         errors.append(self.check_lat_long(VC_LONGITUDE, values[VC_LONGITUDE]))
-        if len(values[VC_API_KEY]) == 0:
-            self.post_error_msg(f'{VC_API_KEY} is required to use Visual Crossing as a data source.')
+        try:
+            Validator.vc_required(values[VC_API_KEY])
+        except ValueError as excep:
+            self.post_error_msg(f'{VC_API_KEY} {excep.args[0]}')
+            errors.append(True)
         return any(errors)
 
     def on_save_validations(self, values) -> bool:
@@ -177,28 +184,34 @@ class SettingsGUI(BaseGUI):
     def on_change_validations(self, values: dict) -> bool:
         self.clear_error_msg()
         errors: list[bool] = []
-        if len(values[DATA_STORE_FOLDER]) == 0:
-            self.post_error_msg(f'{DATA_STORE_FOLDER} must have a value.')
+        try:
+            Validator.required(values[DATA_STORE_FOLDER])
+        except ValueError as excep:
+            self.post_error_msg(f'{DATA_STORE_FOLDER} {excep.args[0]}')
             errors.append(True)
         else:
-            path: Path = Path(values[DATA_STORE_FOLDER])
-            if path.exists() and not path.is_dir():
-                self.post_error_msg(f'{DATA_STORE_FOLDER} must refer to a folder')
+            try:
+                Validator.folder_required(values[DATA_STORE_FOLDER])
+            except NotADirectoryError as excep:
+                self.post_error_msg(f'{DATA_STORE_FOLDER} {excep.args[0]}')
                 errors.append(True)
-        if len(values[INPUT_DATA_FOLDER]) == 0:
-            self.post_error_msg(f'{INPUT_DATA_FOLDER} must have a value.')
+        try:
+            Validator.required(values[INPUT_DATA_FOLDER])
+        except ValueError as excep:
+            self.post_error_msg(f'{INPUT_DATA_FOLDER} {excep.args[0]}')
             errors.append(True)
         else:
-            path: Path = Path(values[INPUT_DATA_FOLDER])
-            if path.exists() and not path.is_dir():
-                self.post_error_msg(f'{INPUT_DATA_FOLDER} must refer to a folder.')
+            try:
+                Validator.folder_required(values[INPUT_DATA_FOLDER])
+            except NotADirectoryError as excep:
+                self.post_error_msg(f'{INPUT_DATA_FOLDER} {excep.args[0]}')
                 errors.append(True)
-        if not values[TEMP_DATA_SOURCE] in TEMP_DATA_SOURCES:
-            self.post_error_msg(f'{TEMP_DATA_SOURCE} not valid.')
+        try:
+            Validator.temp_data_source(values[TEMP_DATA_SOURCE])
+        except ValueError as excep:
+            self.post_error_msg(f'{TEMP_DATA_SOURCE} {excep.args[0]}.')
             errors.append(True)
-        if error := any(errors):
-            ...
-        return error
+        return any(errors)
 
     def on_save_validations(self,  values: dict) -> bool:
         errors: list[bool] = [self.on_change_validations(values)]

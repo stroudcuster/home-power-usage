@@ -1,4 +1,7 @@
+from collections import namedtuple
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import urlopen
 
 from yaml import load, dump, YAMLObject, add_path_resolver
 try:
@@ -9,6 +12,62 @@ except ImportError:
 TEMP_DATA_SOURCE_VISUAL_CROSSING = 'Visual Crossing'
 TEMP_DATA_SOURCE_SC_ACIS = 'SC ACIS'
 TEMP_DATA_SOURCES = [TEMP_DATA_SOURCE_VISUAL_CROSSING, TEMP_DATA_SOURCE_SC_ACIS]
+
+
+class Validator:
+    @staticmethod
+    def url_parse(url_str: str) -> namedtuple:
+        url_parts: namedtuple = urlparse(url_str)
+        if len(url_parts.scheme) == 0 or len(url_parts.netloc) == 0:
+            raise ValueError(f'{url_str} is not a valid URL format.')
+        else:
+            return url_parts
+
+    @staticmethod
+    def url_open(url_str) -> None:
+        try:
+            urlopen(url_str)
+        except ValueError:
+            raise ValueError(f'{url_str} did not respond.')
+
+    @staticmethod
+    def vc_required(value: str) -> None:
+        if len(value.strip()) == 0:
+            raise ValueError('This is required to use Visual Crossing as a data source.')
+
+    @staticmethod
+    def latitude(value: str) -> None:
+        try:
+            float_value = float(value)
+        except ValueError:
+            raise ValueError('Latitude must be numeric.')
+        if float_value < -90 or float_value > 90:
+            raise ValueError('Latitude must be between -90 and 90.')
+
+    @staticmethod
+    def longitude(value: str) -> None:
+        try:
+            float_value = float(value)
+            if float_value < -90 or float_value > 90:
+                raise ValueError('Longitude must be between -90 and 90.')
+        except ValueError:
+            raise ValueError('Longitude must be numeric.')
+
+    @staticmethod
+    def required(value:str) -> None:
+        if len(value.strip()) == 0:
+            raise ValueError('This is a required field')
+
+    @staticmethod
+    def folder_required(value: str) -> None:
+        path: Path = Path(value)
+        if path.exists() and not path.is_dir():
+            raise NotADirectoryError('This path must point to a folder.')
+
+    @staticmethod
+    def temp_data_source(value: str) -> None:
+        if value not in TEMP_DATA_SOURCES:
+            raise ValueError('Selection not valid.')
 
 
 class VisualCrossingSettings:
